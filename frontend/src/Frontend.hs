@@ -2,11 +2,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE RecursiveDo #-}
-{-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Frontend where
 
+import           Control.Monad
 import           Control.Monad.Fix (MonadFix)
-import           Control.Monad.IO.Class (liftIO)
+import           Control.Monad.IO.Class (MonadIO, liftIO)
+import           Data.Maybe (isJust)
 import           GHC.Float
 import           Language.Javascript.JSaddle (JSM, liftJSM)
 import           Language.Javascript.JSaddle.Types (MonadJSM)
@@ -37,13 +39,10 @@ frontend = Frontend
       el "title" $ text "Obelisk Minimal Example"
       elAttr "link" ("href" =: static @"main.css" <> "type" =: "text/css" <> "rel" =: "stylesheet") blank
   , _frontend_body = do
-      prerender_ blank $ do
-        startClick <- button "Begin"
-        _ <- widgetHold blank (ui <$ startClick)
-        pure ()
+      prerender_ blank ui
   }
 
-ui :: (MonadJSM m, DomBuilder t m, MonadHold t m, MonadFix m)
+ui :: (MonadJSM m, DomBuilder t m, PostBuild t m, MonadHold t m, MonadFix m, MonadIO (Performable m), TriggerEvent t m, PerformEvent t m)
    => m ()
 ui = mdo
   stdGen <- liftIO Rand.newStdGen
@@ -61,24 +60,74 @@ ui = mdo
   Node.connect gain1 dest Nothing Nothing
   Node.connect osc2 gain2 Nothing Nothing
   Node.connect gain2 dest Nothing Nothing
-  Osc.start osc1 Nothing
-  Osc.start osc2 Nothing
-
 
   let initState = initGameState stdGen
+      audioEv = leftmost [ playCurEv
+                         , playPrevEv
+                         ]
 
-  gameStateDyn <- foldDyn updateGameState initState noteEv
+      gameStateEv = leftmost [ Guess <$> noteEv
+                             , gate (not . gsAudioInited <$> current gameStateDyn)
+                                    (InitedAudio <$ audioEv)
+                             ]
+
+  startOfRoundEv <- -- have to delay this so that the state has time to update
+    delay 0.1 . void $ ffilter gsStartOfRound (updated gameStateDyn)
+
+  gameStateDyn <- foldDyn updateGameState initState gameStateEv
 
   noteEv <- noteButtons
 
-  playCurClick <- button "Play Current"
+  playCurEv <- button "Play Current"
   _ <- widgetHold blank
      $ liftJSM . playCurPair osc1 gain1 osc2 gain2 audioCtx
-     <$> current gameStateDyn <@ playCurClick
+         <$> current gameStateDyn <@ leftmost [startOfRoundEv, playCurEv]
 
-  -- buttonClick <- button "click me"
-  -- _ <- widgetHold blank (liftJSM audioTest <$ buttonClick)
-  pure ()
+  playPrevEv <- playPrevButton gameStateDyn
+  _ <- widgetHold blank
+     $ liftJSM . playPrevPair osc1 gain1 osc2 gain2 audioCtx
+         <$> current gameStateDyn <@ playPrevEv
+
+  displayPrevNotes gameStateDyn
+  displayCurNotes gameStateDyn
+
+playPrevButton :: (DomBuilder t m, PostBuild t m) => Dynamic t GameState -> m (Event t ())
+playPrevButton gsDyn = do
+  let attrMap = do
+        gs <- gsDyn
+        pure $ if isJust (gsLastPair gs)
+           then mempty
+           else "disabled" =: "true"
+  (ele, _) <- elDynAttr' "button" attrMap $ text "Play Previous"
+  pure $ domEvent Click ele
+
+displayPrevNotes :: (PostBuild t m, DomBuilder t m) => Dynamic t GameState -> m ()
+displayPrevNotes gsDyn = do
+  let txt = do
+        gs <- gsDyn
+        pure $ case gsLastPair gs of
+          Nothing -> ""
+          Just p -> noteText (pitchNote $ lowerPitch p)
+                 <> ", "
+                 <> noteText (pitchNote $ upperPitch p)
+
+  dynText txt
+
+displayCurNotes :: (PostBuild t m, DomBuilder t m) => Dynamic t GameState -> m ()
+displayCurNotes gsDyn = do
+  let txt = do
+        gs <- gsDyn
+        pure $ case gsRoundState gs of
+          RoundStart -> ""
+          GuessedLower -> noteText . pitchNote . lowerPitch $ getCurrentPair gs
+
+  dynText txt
+
+initAudio :: Osc.OscillatorNode -> Osc.OscillatorNode -> GameState -> JSM ()
+initAudio osc1 osc2 gs =
+  unless (gsAudioInited gs) $ do
+    Osc.start osc1 Nothing
+    Osc.start osc2 Nothing
 
 playCurPair :: Osc.OscillatorNode
             -> Gain.GainNode
@@ -88,6 +137,7 @@ playCurPair :: Osc.OscillatorNode
             -> GameState
             -> JSM ()
 playCurPair osc1 gain1 osc2 gain2 audioCtx gs = do
+  initAudio osc1 osc2 gs
   let PitchPair l u = getCurrentPair gs
   playNote l osc1 gain1 audioCtx
   playNote u osc2 gain2 audioCtx
@@ -99,7 +149,8 @@ playPrevPair :: Osc.OscillatorNode
              -> Ctx.AudioContext
              -> GameState
              -> JSM ()
-playPrevPair osc1 gain1 osc2 gain2 audioCtx gs =
+playPrevPair osc1 gain1 osc2 gain2 audioCtx gs = do
+  initAudio osc1 osc2 gs
   case gsLastPair gs of
     Nothing -> pure ()
     Just (PitchPair l u) -> do
