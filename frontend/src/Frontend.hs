@@ -69,6 +69,7 @@ ui = do
   Node.connect gain2 pan2 Nothing Nothing
   Node.connect pan2 dest Nothing Nothing
 
+  -- UI elements
   divClass "main-wrapper" $ mdo
 
     let initState = initGameState stdGen
