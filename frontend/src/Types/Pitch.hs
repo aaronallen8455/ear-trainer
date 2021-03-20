@@ -4,6 +4,7 @@ module Types.Pitch
   , Pitch(..)
   , PitchPair(..)
   , pitchFreq
+  , dupePair
   ) where
 
 import qualified Data.Text as T
@@ -41,7 +42,7 @@ upperBound :: Pitch
 upperBound = Pitch C 6
 
 lowerBound :: Pitch
-lowerBound = Pitch A 2
+lowerBound = Pitch A 4
 
 instance Random Pitch where
   randomR (Pitch n1 o1, Pitch n2 o2) g = (p, g')
@@ -67,6 +68,9 @@ data PitchPair =
     { lowerPitch :: !Pitch
     , upperPitch :: !Pitch
     } deriving (Show, Eq)
+
+dupePair :: PitchPair -> Bool
+dupePair (PitchPair a b) = a == b
 
 instance Random PitchPair where
   randomR (PitchPair l1 _, PitchPair _ u2) g = (PitchPair rl ru, g'')

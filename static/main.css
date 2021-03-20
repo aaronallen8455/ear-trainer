@@ -1,0 +1,43 @@
+body {
+  background-color: dodgerblue;
+}
+
+div.main-wrapper {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  background-color: white;
+  padding: 20px;
+  border-radius: 10px;
+  border: solid black 1px;
+  box-shadow: 10px 10px 40px #00000078;
+}
+
+div.note-buttons {
+  display: grid;
+  grid-template-columns: 3em 3em 3em;
+  grid-template-rows: 3em 3em 3em 3em;
+}
+
+div.dashboard-wrapper {
+  padding: 5px 25px;
+}
+
+div.dashboard-wrapper * {
+  margin-bottom: 5px;
+}
+
+div.dashboard-wrapper button {
+  display: block;
+}
+
+div.dash-field {
+  display: block;
+}
+
+span.dash-label {
+  font-weight: bold;
+  padding-right: 10px;
+}
