@@ -38,6 +38,12 @@ data Pitch =
     , pitchOctave :: Octave
     } deriving (Show, Eq)
 
+instance Ord Pitch where
+  Pitch na oa <= Pitch nb ob =
+    if oa == ob
+       then na <= nb
+       else oa <= ob
+
 upperBound :: Pitch
 upperBound = Pitch C 6
 
@@ -78,7 +84,7 @@ instance Random PitchPair where
       (rl, g')  = randomR (l1, u2) g
       (ru, g'') = randomR (rl, u2) g'
 
-  random g = (PitchPair l u, g'') where
-    (l, g')  = random g
-    (u, g'') = randomR (l, upperBound) g'
+  random g = (PitchPair (min a b) (max a b), g'') where
+    (a, g')  = random g
+    (b, g'') = random g'
 

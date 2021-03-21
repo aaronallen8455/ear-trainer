@@ -10,6 +10,7 @@ module Types.GameState
   , getCurrentPair
   ) where
 
+import           Data.List
 import           System.Random
 
 import           Types.Pitch
@@ -41,12 +42,15 @@ initGameState gen =
     , gsNumCorrect   = 0
     , gsNumWrong     = 0
     , gsLastPair     = Nothing
-    , gsPairStream   = filter (not . dupePair) $ randoms gen
+    , gsPairStream   = removeRepeats . filter (not . dupePair) $ randoms gen
     , gsRoundState   = GuessedLower
     , gsLevelScore   = 0
     , gsStartOfRound = False
     , gsAudioInited  = False
     }
+
+removeRepeats :: Eq a => [a] -> [a]
+removeRepeats = concatMap (take 1) . group
 
 data GameStateEvent
   = Guess Note

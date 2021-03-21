@@ -12,7 +12,7 @@ the higher note correctly to proceed.
 The goal is to develop your ability to hear intervals both horizontally and
 vertically.
 
-### Technology used
+### Tech
 
 This a full stack haskell web app using the Reflex FRP framework. The WebAudio
 API is used to interface with audio hardware.
