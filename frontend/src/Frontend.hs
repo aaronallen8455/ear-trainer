@@ -9,9 +9,11 @@ import           Control.Monad
 import           Control.Monad.Fix (MonadFix)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Data.Maybe (isJust)
+import qualified Data.Text as T
 import           GHC.Float
 import           Language.Javascript.JSaddle (JSM, liftJSM)
 import           Language.Javascript.JSaddle.Types (MonadJSM)
+import           Numeric (showGFloat)
 import qualified System.Random as Rand
 
 import qualified GHCJS.DOM.AudioContext as Ctx
@@ -37,7 +39,7 @@ import           Types.Pitch
 frontend :: Frontend (R FrontendRoute)
 frontend = Frontend
   { _frontend_head = do
-      el "title" $ text "Obelisk Minimal Example"
+      el "title" $ text "Ear Trainer"
       elAttr "link" ("href" =: static @"main.css" <> "type" =: "text/css" <> "rel" =: "stylesheet") blank
   , _frontend_body = do
       prerender_ blank ui
@@ -84,6 +86,8 @@ ui = do
 
     gameStateDyn <- foldDyn updateGameState initState gameStateEv
 
+    levelProgressBar gameStateDyn
+
     noteEv <- divClass "note-buttons" noteButtons
 
     audioEv <- divClass "dashboard-wrapper" $ do
@@ -104,6 +108,21 @@ ui = do
                       , playPrevEv
                       ]
     pure ()
+
+levelProgressBar :: (DomBuilder t m, PostBuild t m)
+                 => Dynamic t GameState -> m ()
+levelProgressBar gsDyn = do
+  let percentTxt = T.pack . ($ "")
+                 . showGFloat (Just 2)
+                 . levelCompletePercent
+      attrDyn = ffor gsDyn
+              $ \gs -> "style" =: ("width: " <> percentTxt gs <> "%")
+                    <> "class" =: "progress-bar-filler"
+  elClass "span" "level" . dynText $ do
+    level <- gsLevel <$> gsDyn
+    pure $ "Level " <> T.pack (show level)
+
+  divClass "progress-bar" $ elDynAttr "div" attrDyn blank
 
 playPrevButton :: (DomBuilder t m, PostBuild t m) => Dynamic t GameState -> m (Event t ())
 playPrevButton gsDyn = do

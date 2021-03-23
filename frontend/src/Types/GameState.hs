@@ -8,6 +8,7 @@ module Types.GameState
   , incorrectGuess
   , updateGameState
   , getCurrentPair
+  , levelCompletePercent
   ) where
 
 import           Data.List
@@ -30,7 +31,8 @@ data GameState =
     , gsLastPair     :: !(Maybe PitchPair)
     , gsPairStream   :: [PitchPair]
     , gsRoundState   :: !RoundState
-    , gsLevelScore   :: !Word
+    , gsLevelScore   :: !Int
+    , gsGuessedWrong :: !Bool
     , gsStartOfRound :: !Bool
     , gsAudioInited  :: !Bool
     } deriving (Show)
@@ -45,6 +47,7 @@ initGameState gen =
     , gsPairStream   = removeRepeats . filter (not . dupePair) $ randoms gen
     , gsRoundState   = GuessedLower
     , gsLevelScore   = 0
+    , gsGuessedWrong = False
     , gsStartOfRound = False
     , gsAudioInited  = False
     }
@@ -62,23 +65,37 @@ correctGuess gs =
     RoundStart ->
       gs { gsRoundState   = GuessedLower
          , gsNumCorrect   = gsNumCorrect gs + 1
-         , gsLevelScore   = gsLevelScore gs + 1
          , gsStartOfRound = False
          }
-    GuessedLower ->
-      gs { gsLastPair     = Just . head $ gsPairStream gs
-         , gsPairStream   = tail $ gsPairStream gs
-         , gsNumCorrect   = gsNumCorrect gs + 1
-         , gsLevelScore   = gsLevelScore gs + 1
-         , gsRoundState   = RoundStart
-         , gsStartOfRound = True
-         }
+    GuessedLower
+      | not $ gsGuessedWrong gs
+      , gsLevelScore gs' == nxtLevelScore -- level up!
+      -> gs' { gsLevelScore = 0
+             , gsLevel      = gsLevel gs + 1
+             }
+      | otherwise -> gs'
+      where
+        nxtLevelScore = scoreForNextLevel (gsLevel gs)
+        gs' = gs { gsLastPair     = Just . head $ gsPairStream gs
+                 , gsPairStream   = tail $ gsPairStream gs
+                 , gsNumCorrect   = gsNumCorrect gs + 1
+                 , gsLevelScore   = if gsGuessedWrong gs
+                                       then gsLevelScore gs
+                                       else gsLevelScore gs + 1
+                 , gsRoundState   = RoundStart
+                 , gsStartOfRound = True
+                 , gsGuessedWrong = False
+                 }
 
 incorrectGuess :: GameState -> GameState
 incorrectGuess gs =
   gs { gsNumWrong     = gsNumWrong gs + 1
-     , gsLevelScore   = max 0 $ gsLevelScore gs - 1
+     , gsLevelScore   = if gsGuessedWrong gs
+                           then gsLevelScore gs
+                           else max 0 $ gsLevelScore gs
+                                      - wrongGuessPenalty (gsLevel gs)
      , gsStartOfRound = False
+     , gsGuessedWrong = True
      }
 
 checkGuess :: Note -> GameState -> Bool
@@ -99,3 +116,14 @@ updateGameState InitedAudio gs =
 
 getCurrentPair :: GameState -> PitchPair
 getCurrentPair = head . gsPairStream
+
+scoreForNextLevel :: Level -> Int
+scoreForNextLevel l = 4 + fromIntegral l
+
+wrongGuessPenalty :: Level -> Int
+wrongGuessPenalty l = ceiling $ fromIntegral l / (2 :: Double)
+
+levelCompletePercent :: GameState -> Double
+levelCompletePercent gs = fromIntegral (gsLevelScore gs)
+                        / fromIntegral (scoreForNextLevel $ gsLevel gs)
+                        * 100

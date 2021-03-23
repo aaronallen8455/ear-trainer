@@ -7,7 +7,7 @@ div.main-wrapper {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  display: flex;
+  flex-wrap: wrap;
   background-color: white;
   padding: 20px;
   border-radius: 10px;
@@ -16,12 +16,14 @@ div.main-wrapper {
 }
 
 div.note-buttons {
-  display: grid;
+  display: inline-grid;
+  vertical-align: top;
   grid-template-columns: 3em 3em 3em;
   grid-template-rows: 3em 3em 3em 3em;
 }
 
 div.dashboard-wrapper {
+  display: inline-block;
   padding: 5px 25px;
 }
 
@@ -35,9 +37,28 @@ div.dashboard-wrapper button {
 
 div.dash-field {
   display: block;
+  min-width: 175px;
 }
 
 span.dash-label {
   font-weight: bold;
   padding-right: 10px;
+}
+
+div.progress-bar {
+  margin: 10px 0 15px 0;
+  height: 6px;
+  background-color: lightgrey;
+  border-radius: 3px;
+}
+
+div.progress-bar-filler {
+  background-color: #96beda;
+  height: 6px;
+  transition: width .3s ease-out;
+  border-radius: 3px;
+}
+
+span.level {
+  font-size: .8em;
 }
